@@ -23,12 +23,13 @@ public class Drawer : MonoBehaviour
     public Color temporary_color;
     bool was_mouse_down;
     bool undoing;
+    bool redoing;
     public TMP_Dropdown dropdown;
     bool on_screen_collision;
     bool eraseMode = false;
     public Slider slider;
     public TextMeshProUGUI sliderText;
-    Vector2 previousPosition;
+    Vector3 previousPosition;
     public struct Pixel
     {
         public Color32 color;
@@ -104,31 +105,26 @@ public class Drawer : MonoBehaviour
             else
                 on_screen_collision = false;
 
+            //pos.y -=transparent.transform.position.y;
+            pos.y -= 25.725f;
+
             if (Input.GetMouseButton(0) && on_screen_collision)
             {
-                //pos.y -=transparent.transform.position.y;
                 if (undoing)
                 {
-
                     undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
                     undoing = false;
                 }
-                pos.y -= 25.725f;
+                if(redoing)
+                {
+                    undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
+                    redoing = false;
+                }
                 undo_pixel_stack.Push(new Pixel(pos, clr, brushSize));
                 was_mouse_down = true;
                 int count = undo_pixel_stack.Count;
-                if (undo_pixel_stack.Count == 1 && !undoing)
-                {
                     brushDraw(pos, brushSize, clr);
-                }
-                if (undo_pixel_stack.Count > 1 && !undoing)
-                {
-                    if (undo_pixel_stack.ElementAt(count - 1).position.x == -100)
-                        brushLine(previousPosition, pos, brushSize, clr);
-                    else
-                        brushLine(previousPosition, pos, brushSize, clr);
-                }
-
+                    brushLine(previousPosition, pos, brushSize, clr);
             }
             else if (Input.GetMouseButton(0))
             {
@@ -138,9 +134,18 @@ public class Drawer : MonoBehaviour
                     RenderClear();
                     if (undo_pixel_stack.Count > 0)
                     {
-                        undo_pixel_stack.Pop();
+                       redo_pixel_stack.Push( undo_pixel_stack.Pop());
 
                         //undo_pixel_stack.Push(new Pixel(last_element, clr, brushSize));
+                    }
+                    drawStack();
+                }
+                if (redoing)
+                {
+                    RenderClear();
+                    if (redo_pixel_stack.Count > 0)
+                    {
+                        undo_pixel_stack.Push(redo_pixel_stack.Pop());
                     }
                     drawStack();
                 }
@@ -170,59 +175,6 @@ public class Drawer : MonoBehaviour
             previousPosition = pos;
         }
     }
-    /*private void Draw(Vector2 pixelUV,int stackIndex) //realised drawing from stack was a bad idea as stack traversal is not a joke
-    {
-
-        for (int i = (int)(pixelUV.x - undo_pixel_stack.ElementAt(stackIndex).pixelSize * 100); i < (int)(pixelUV.x + undo_pixel_stack.ElementAt(stackIndex).pixelSize * 100); i++)
-        {
-            for (int j = (int)(pixelUV.y - undo_pixel_stack.ElementAt(stackIndex).pixelSize * 100); j < (int)(pixelUV.y + undo_pixel_stack.ElementAt(stackIndex).pixelSize * 100); j++)
-            {
-                
-                int pixelIndex = j * drawing_tex.width + i;
-                if (pixelIndex < 0 || pixelIndex >= color_array.Length)
-                    return;
-                color_array[pixelIndex] = undo_pixel_stack.ElementAt(stackIndex).color;
-            }
-        }
-    }*/
-
-    /*public Vector2 WorldToPixelCoordinates(Vector3 world_position)
-    {
-        // Change coordinates to local coordinates of this image
-        Vector3 local_pos = transform.InverseTransformPoint(world_position);
-
-        // Change these to coordinates of pixels
-        float pixelWidth = transparent.sprite.rect.width;
-        float pixelHeight = transparent.sprite.rect.height;
-        float unitsToPixels = pixelWidth / transparent.sprite.bounds.size.x * transform.localScale.x;
-
-        // Need to center our coordinates
-        float centered_x = local_pos.x * unitsToPixels + pixelWidth / 2;
-        float centered_y = local_pos.y * unitsToPixels + pixelHeight / 2;
-
-        // Round current mouse position to nearest pixel
-        Vector2 pixel_pos = new Vector2(Mathf.RoundToInt(centered_x), Mathf.RoundToInt(centered_y));
-
-        return pixel_pos;
-
-
-    }*/
-    /* public void DrawLine(Vector2 start, Vector2 end,int stackIndex)
-     {
-         if (start.x == -100 && start.y == -100 )
-         {
-             return;
-         }
-         if (end.x == -100 && end.y == -100)
-             return;
-         float distance = Vector2.Distance(start, end);
-         Vector2 direction = (end - start).normalized;
-         for (int i = 0; i < distance; i++)
-         {
-             Draw(start + direction * i,stackIndex);
-         }
-     }
- */
     private void brushDraw(Vector2 pixelUV, float pixelSize, Color curColor) //implemented draw method without the need of a stack
     {
 
@@ -266,10 +218,15 @@ public class Drawer : MonoBehaviour
     public void Undo()
     {
         undoing = true;
+        redoing = false;
     }
     public void Redo()
     {
-
+        if(undoing)
+        {
+            undoing = false;
+            redoing = true;
+        }
     }
     public void Eraser()
     {
@@ -321,37 +278,6 @@ public class Drawer : MonoBehaviour
         }
 
     }
-    /*public void Remove(Pixel pixel)
-    {
-        Vector2 pixelUV = pixel.position;
-        for (int i = (int)(pixelUV.x - pixel.pixelSize * 100); i < (int)(pixelUV.x + pixel.pixelSize * 100); i++)
-        {
-            for (int j = (int)(pixelUV.y - pixel.pixelSize * 100); j < (int)(pixelUV.y + pixel.pixelSize * 100); j++)
-            {
-                int pixelIndex = j * drawing_tex.width + i;
-                if (pixelIndex < 0 || pixelIndex >= color_array.Length)
-                    return;
-                color_array[pixelIndex] = Default_Color;
-            }
-        }
-    }*/
-    /* public void removeLine(Pixel start,Pixel end)
-     {
-         if (start.position.x == -100 && start.position.y == -100)
-         {
-             return;
-         }
-         if (end.position.x == -100 && end.position.y == -100)
-             return;
-         float distance = Vector2.Distance(start.position, end.position);
-         Vector2 direction = (end.position - start.position).normalized;
-         for (int i = 0; i < distance; i++)
-         {
-             Remove(new Pixel((start.position + direction * i),start.color,start.pixelSize));
-         }
-     }
- */
-
 
 }
 
