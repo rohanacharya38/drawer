@@ -1,9 +1,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using TMPro;
-
+using Unity.VisualScripting;
 using UnityEngine;
 
 using UnityEngine.UI;
@@ -24,12 +25,14 @@ public class Drawer : MonoBehaviour
     bool was_mouse_down;
     bool undoing;
     bool redoing;
+    bool undo_canceled;
     public TMP_Dropdown dropdown;
-    bool on_screen_collision;
     bool eraseMode = false;
     public Slider slider;
     public TextMeshProUGUI sliderText;
+
     Vector3 previousPosition;
+
     public struct Pixel
     {
         public Color32 color;
@@ -52,6 +55,7 @@ public class Drawer : MonoBehaviour
         RenderClear();
         drawing_tex.Apply();
         undo_pixel_stack.Clear();
+        redo_pixel_stack.Clear();
     }
     //TODO: ASSIGN COLOR SPRITES FOR COLOR DROPDOWN
     private void Start()
@@ -59,6 +63,7 @@ public class Drawer : MonoBehaviour
 
         slider.onValueChanged.AddListener((v) =>
         {
+
             sliderText.text = v.ToString("0.01");
             if (v < 0.01)
             {
@@ -68,10 +73,13 @@ public class Drawer : MonoBehaviour
                 brushSize = v;
 
         });
+        
+
 
         drawing_tex = transparent.sprite.texture;
         Default_Color = Color.yellow;
         clr = Color.black;
+
         // Initialize clean pixels to use
         color_array = new Color32[drawing_tex.width * drawing_tex.height];
 
@@ -85,6 +93,8 @@ public class Drawer : MonoBehaviour
         drawing_tex.Apply();
         undo_pixel_stack = new Stack<Pixel>();
         redo_pixel_stack = new Stack<Pixel>();
+        previousPosition.x = -100f;
+        previousPosition.y = -100f;
 
     }
     public void RenderClear()       //it is named as render clear as im familiar with SDL
@@ -96,84 +106,64 @@ public class Drawer : MonoBehaviour
     }
     private void Update()
     {
-        if (!dropdown.IsExpanded)
+        if (!dropdown.IsExpanded && !undoing && !redoing)
         {
 
             Vector3 pos = Input.mousePosition;
-            if (pos.y > 50)
-                on_screen_collision = true;
-            else
-                on_screen_collision = false;
-
-            //pos.y -=transparent.transform.position.y;
             pos.y -= 25.725f;
-
-            if (Input.GetMouseButton(0) && on_screen_collision)
+            /*   if(undoing && Input.GetMouseButtonUp(0))
+               {
+                   undoing = false;
+               }
+               if(redoing && Input.GetMouseButtonUp(0))
+               {
+                   redoing = false;
+               }*/
+            if (Input.GetMouseButton(0))
             {
-                if (undoing)
+
+
+                if (pos.y > 50 &&(pos.x<868||pos.x>910))
                 {
-                    undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
-                    undoing = false;
-                }
-                if(redoing)
-                {
-                    undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
-                    redoing = false;
-                }
-                undo_pixel_stack.Push(new Pixel(pos, clr, brushSize));
-                was_mouse_down = true;
-                int count = undo_pixel_stack.Count;
+                    //pos.y -=transparent.transform.position.y;
+                    undo_pixel_stack.Push(new Pixel(pos, clr, brushSize));
+                    was_mouse_down = true;
                     brushDraw(pos, brushSize, clr);
                     brushLine(previousPosition, pos, brushSize, clr);
-            }
-            else if (Input.GetMouseButton(0))
-            {
-
-                if (undoing)
-                {
-                    RenderClear();
-                    if (undo_pixel_stack.Count > 0)
+                    previousPosition = pos;
+                    if(undo_canceled)
                     {
-                       redo_pixel_stack.Push( undo_pixel_stack.Pop());
-
-                        //undo_pixel_stack.Push(new Pixel(last_element, clr, brushSize));
+                        undo_canceled = false;
+                        redo_pixel_stack.Clear();
                     }
-                    drawStack();
-                }
-                if (redoing)
-                {
-                    RenderClear();
-                    if (redo_pixel_stack.Count > 0)
-                    {
-                        undo_pixel_stack.Push(redo_pixel_stack.Pop());
-                    }
-                    drawStack();
                 }
                 else if (was_mouse_down)
-                {
-                    undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
-                }
-                was_mouse_down = false;
-
+                    {
+                        undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
+                    }
             }
             else
             {
                 if (was_mouse_down)
                 {
-
                     undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
-
-
+                    was_mouse_down = false;
                 }
-                was_mouse_down = false;
+                if (pos.y < 50)
+                {
+                    previousPosition.x = -100;
+                    previousPosition.y = -100;
+                }
+                else
+                    previousPosition = pos;
             }
 
             // drawStack();
 
             drawing_tex.SetPixels32(color_array);
-            drawing_tex.Apply();            //writing these here so that they may be callled only once per frame
-            previousPosition = pos;
+            drawing_tex.Apply();       //writing these here so that they may be callled only once per frame
         }
+
     }
     private void brushDraw(Vector2 pixelUV, float pixelSize, Color curColor) //implemented draw method without the need of a stack
     {
@@ -209,25 +199,17 @@ public class Drawer : MonoBehaviour
 
     public void drawStack()
     {
-        for (int i = 1; i < undo_pixel_stack.Count; i++)
+        int last_index = undo_pixel_stack.Count - 1;
+        Pixel previous =undo_pixel_stack.ElementAt(last_index);
+        Pixel present;
+        for (int i = last_index-1; i >0; i--)
         {
-            brushLine(undo_pixel_stack.ElementAt(i).position, undo_pixel_stack.ElementAt(i - 1).position, undo_pixel_stack.ElementAt(i).pixelSize, undo_pixel_stack.ElementAt(i).color);
-        }
-
-    }
-    public void Undo()
-    {
-        undoing = true;
-        redoing = false;
-    }
-    public void Redo()
-    {
-        if(undoing)
-        {
-            undoing = false;
-            redoing = true;
+            present = undo_pixel_stack.ElementAt(i);
+            brushLine(present.position, previous.position, present.pixelSize, present.color);
+            previous = present;
         }
     }
+    
     public void Eraser()
     {
         if (!eraseMode)
@@ -246,30 +228,28 @@ public class Drawer : MonoBehaviour
 
     }
 
-    public void Color_Changer(Int32 value)
+    public void Color_Changer()
     {
+        
         if (eraseMode)
         {
             eraseMode = false;
             clr = temporary_color;
         }
-        value = dropdown.value;
-
-
-
+        var value = dropdown.value;
         switch (value)
         {
             case 0:
-                clr = Color.black;
+                clr =Color.black;
                 break;
             case 1:
                 clr = Color.red;
                 break;
             case 2:
-                clr = Color.blue;
+                clr = Color.green;
                 break;
             case 3:
-                clr = Color.green;
+                clr = Color.blue;
                 break;
 
             default:
@@ -277,6 +257,98 @@ public class Drawer : MonoBehaviour
                 break;
         }
 
+    }
+    public void onSave()
+    {
+        System.Random rnd = new System.Random();
+
+        String filepath = Application.persistentDataPath + "whiteboardimg" + rnd.Next() + ".png";
+        Debug.Log(filepath);
+        Byte[] filebytes = drawing_tex.EncodeToPNG();
+        //FileStream file = File.OpenWrite(filepath);
+        File.WriteAllBytes(filepath, filebytes);
+
+    }
+
+    public void undoDown()
+    {
+        if(eraseMode)
+        {
+        eraseMode = false;
+        clr = temporary_color;
+        }
+        undoing = true;
+        
+        int count = undo_pixel_stack.Count;
+        if (count > 0)
+        {
+            Pixel pop = undo_pixel_stack.Pop();
+            count--;
+            while (pop.position.x == -100 && count > 0)
+            {
+                pop = undo_pixel_stack.Pop();
+                count--;
+            }
+            redo_pixel_stack.Push(pop);
+                while (pop.position.x != -100 && count>0)
+                {
+                    pop = undo_pixel_stack.Pop();
+                    redo_pixel_stack.Push(pop);
+                    count--;
+                }
+            redo_pixel_stack.Push(pop);
+            RenderClear();
+            if(count>0)
+            {
+            drawStack();
+            }
+            //undo_pixel_stack.Push(new Pixel(last_element, clr, brushSize));
+        }
+    }
+    public void undoUp()
+    {
+        
+        undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
+        undoing = false;
+        undo_canceled = true;
+
+    }
+    public void redoDown()
+    {
+        
+        if(eraseMode)
+        {
+            eraseMode = false;
+            clr = temporary_color;
+        }
+        redoing = true;
+        int count = redo_pixel_stack.Count;
+        if (count>0)
+        {
+            Pixel pop = redo_pixel_stack.Pop();
+            count--;
+            while (pop.position.x == -100 && count > 0)
+            {
+                pop = redo_pixel_stack.Pop();
+                count--;
+            }
+            undo_pixel_stack.Push(pop);
+            while (pop.position.x != -100 && count>0)
+            {
+                pop = redo_pixel_stack.Pop();
+                count--;
+                undo_pixel_stack.Push(pop);
+            }
+            undo_pixel_stack.Push(pop);
+            RenderClear();
+            drawStack();
+            //undo_pixel_stack.Push(new Pixel(last_element, clr, brushSize));
+        }
+    }
+    public void redoUp()
+    {
+        undo_pixel_stack.Push(new Pixel(new Vector2(-100, -100), clr, brushSize));
+        redoing = false;
     }
 
 }
