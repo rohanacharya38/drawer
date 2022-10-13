@@ -109,7 +109,7 @@ public class Drawer : MonoBehaviour
         if (!dropdown.IsExpanded && !undoing && !redoing)
         {
 
-            Vector3 pos = Input.mousePosition;
+            Vector3 pos = Input.mousePosition ;
             pos.y -= 25.725f;
             /*   if(undoing && Input.GetMouseButtonUp(0))
                {
@@ -128,6 +128,7 @@ public class Drawer : MonoBehaviour
                     //pos.y -=transparent.transform.position.y;
                     undo_pixel_stack.Push(new Pixel(pos, clr, brushSize));
                     was_mouse_down = true;
+                    if(previousPosition==pos)
                     brushDraw(pos, brushSize, clr);
                     brushLine(previousPosition, pos, brushSize, clr);
                     previousPosition = pos;
@@ -167,6 +168,8 @@ public class Drawer : MonoBehaviour
     }
     private void brushDraw(Vector2 pixelUV, float pixelSize, Color curColor) //implemented draw method without the need of a stack
     {
+        if (pixelUV.x == -100)
+            return;
 
         for (int i = (int)(pixelUV.x - pixelSize * 100); i < (int)(pixelUV.x + pixelSize * 100); i++)
         {
@@ -205,6 +208,10 @@ public class Drawer : MonoBehaviour
         for (int i = last_index-1; i >0; i--)
         {
             present = undo_pixel_stack.ElementAt(i);
+            if(previous.position.x==-100)
+            {
+                brushDraw(present.position, present.pixelSize, present.color);
+            }
             brushLine(present.position, previous.position, present.pixelSize, present.color);
             previous = present;
         }
