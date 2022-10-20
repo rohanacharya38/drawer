@@ -56,7 +56,7 @@ public class Drawer : MonoBehaviour
     Color32[] color_array;         //color array representing each pixel of our texture
     List<Pixel> undo_pixel_list;    //this list stores all the pixel in image that the user pressed
     List<Pixel> redo_pixel_list;    //while undoing, undoed pixels are pushed here
-    
+   
     //TODO: ASSIGN COLOR SPRITES FOR COLOR DROPDOWN
 
 
@@ -139,7 +139,7 @@ public class Drawer : MonoBehaviour
 
                 Vector2 pos = Input.mousePosition;          //pos contains position of mouse in Screen
 
-                if (!RectTransformUtility.RectangleContainsScreenPoint(bottom_rect,pos) )           //the bottom rect is the rect around the buttons on bottom of screen
+                if (!RectTransformUtility.RectangleContainsScreenPoint(bottom_rect,pos) && !RectTransformUtility.RectangleContainsScreenPoint((RectTransform)dayNight.transform, pos))           //the bottom rect is the rect around the buttons on bottom of screen
                 {
                     pos = mouseToImagePixels(pos);              
                     undo_pixel_list.Add(new Pixel(pos, clr, brushSize));    //pushing the pixel to our undo list
@@ -225,20 +225,23 @@ public class Drawer : MonoBehaviour
     //draws the undo list on screen
     public void drawList()
     {
-        Pixel current;
-        Pixel previous = undo_pixel_list[0];
-
-        for(int i=1;i<undo_pixel_list.Count;i++)
+        if (undo_pixel_list.Count > 0)
         {
-            current = undo_pixel_list[i];
-            if (current.position.x == -100)
-            {
-                brushDraw(previous.position, previous.pixelSize, previous.color);
-            }
-            else
-            brushLine(current.position, previous.position, previous.pixelSize, previous.color);
+            Pixel current;
+            Pixel previous = undo_pixel_list[0];
 
-            previous = current;
+            for (int i = 1; i < undo_pixel_list.Count; i++)
+            {
+                current = undo_pixel_list[i];
+                if (current.position.x == -100)
+                {
+                    brushDraw(previous.position, previous.pixelSize, previous.color);
+                }
+                else
+                    brushLine(current.position, previous.position, previous.pixelSize, previous.color);
+
+                previous = current;
+            }
         }
         
     }
